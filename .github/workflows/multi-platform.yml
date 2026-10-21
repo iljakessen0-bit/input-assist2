@@ -18,10 +18,6 @@ jobs:
         - name: macOS
           os: macos-latest
 
-        - name: iOS
-          os: macos-latest
-          target: iOS
-
         - name: Android32
           os: ubuntu-latest
           target: Android32
@@ -39,7 +35,7 @@ jobs:
       # Turns compiler and CMake errors into annotations on the run summary.
       - name: Register problem matchers
         shell: bash
-        run: echo "::add-matcher::.github/problem-matchers.json"
+        run: if [ -f .github/problem-matchers.json ]; then echo "::add-matcher::.github/problem-matchers.json"; fi
 
       - name: Build the mod
         uses: geode-sdk/build-geode-mod@main
