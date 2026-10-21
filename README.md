@@ -61,14 +61,13 @@ If a Geode CLI profile is set, the `.geode` file is copied into your mods folder
 
 ### Option B: build in GitHub Actions (all platforms, no local toolchain)
 
-Push this folder to a GitHub repository. `.github/workflows/multi-platform.yml` builds Windows and macOS, combines them into one `chief.input-assist.geode`, and publishes it on the repo's **Releases** page. If one platform fails, the others are still combined and released.
+Push this folder to a GitHub repository. `.github/workflows/multi-platform.yml` builds the Windows version, packages it as `chief.input-assist.geode`, and publishes it on the repo's **Releases** page.
 
 ## Installing
 
 Copy `chief.input-assist.geode` into the Geode mods folder and restart GD:
 
 - **Windows**: `<Geometry Dash folder>/geode/mods/`
-- **macOS**: `~/Library/Application Support/GeometryDash/geode/mods/`
 
 Or open the Geode menu in-game, click the folder icon, and drop the file there.
 
