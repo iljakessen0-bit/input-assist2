@@ -61,7 +61,7 @@ If a Geode CLI profile is set, the `.geode` file is copied into your mods folder
 
 ### Option B: build in GitHub Actions (all platforms, no local toolchain)
 
-Push this folder to a GitHub repository. `.github/workflows/multi-platform.yml` builds Windows, macOS, iOS, Android32 and Android64, then combines them into one `chief.input-assist.geode`. Download it from the run's **Build Output** artifact.
+Push this folder to a GitHub repository. `.github/workflows/multi-platform.yml` builds Windows, macOS, Android32 and Android64, combines them into one `chief.input-assist.geode`, and publishes it on the repo's **Releases** page. If one platform fails, the others are still combined and released.
 
 ## Installing
 
