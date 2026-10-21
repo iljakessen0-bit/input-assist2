@@ -1,94 +1,87 @@
 # Input Assist (Geode mod for Geometry Dash 2.2081)
 
-Tick-based **click delay** and **jump buffering** for Geometry Dash, built on Geode SDK v5.
+Early-click rescue for Geometry Dash, built on Geode SDK v5. A jump press that comes a few physics ticks too soon stays alive until it can do something.
 
-| Setting | Range | Default | What it does |
-| --- | --- | --- | --- |
-| Enable Input Assist | on/off | on | Master switch; applies immediately, even mid-level. |
-| Click Delay (ticks) | 0–24 | 1 | Every press **and** release lands N physics ticks later (1 tick = 1/240 s ≈ 4.2 ms). Hold lengths are unchanged. |
-| Buffer Ticks | 0–24 | 2 | Every press is held for at least N ticks, so a tap released just before you land or reach an orb still counts. Longer holds are untouched. |
-| Affect Platformer Movement | on/off | off | Also adjust left/right in platformer levels (otherwise jump only). |
-| Practice Mode Only | on/off | off | Only adjust inputs while practice mode is on. |
-| Show Indicator | on/off | on | Small "Input Assist: delay Nt, buffer Nt" label in the top-left of a level. |
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Enable Input Assist | on | Master switch; applies immediately, even mid-level. |
+| Rescue Stage | Stage 1 (+2 ticks) | Off, +2, +4, +8 or +16 ticks. How long an early jump press stays alive (1 tick = 1/240 s ≈ 4.2 ms). |
+| Cycle Stage | **F6** | Steps through the stages in game; a toast shows the new one. Rebindable. |
+| Practice Mode Only | off | Only assist while practice mode is on. |
+| Show Indicator | on | Stage in the top-left corner of a level, with each save shown under it for a moment. |
+| Log Saves | on | Writes every save to Geode's log: `Saved 3 ticks on tick 1042 (landing)`. |
+| Fixed Click Delay | 0 | Advanced: moves every jump press and release a fixed number of ticks later. |
 
-All settings are in **Geode → Input Assist → Settings**, including from the pause menu.
+Settings live in **Geode → Input Assist → Settings**, including from the pause menu. To watch saves live on Windows, turn on **Show Platform Console** in Geode's own settings; a console window opens next to the game.
 
 ## How it works
 
-GD 2.2 runs physics in fixed steps of 1/240 s. Once per step, `GJBaseGameLayer::processCommands` applies the clicks collected since the last step, each through `GJBaseGameLayer::handleButton`, which is where a click reaches the player.
+GD 2.2 runs physics in fixed ticks of 1/240 s. Once per tick, `GJBaseGameLayer::processCommands` applies the clicks collected since the last tick through `GJBaseGameLayer::handleButton`, which is where a click reaches the player.
 
-- **`processCommands` hook**: counts ticks. At the start of each tick it delivers any held-back input that has come due, before the game simulates that tick.
-- **`handleButton` hook**: asks `InputScheduler` which tick the input should land on. That is the tick vanilla would use (the *base*), plus the click delay; a release may also be pushed later by the buffer. If nothing was added the input goes straight through, so timing is exactly vanilla. Otherwise it is queued.
-- **Ordering**: inputs for the same button can never overtake each other, so a press/release pair can't swap and leave the button stuck.
-- **`PlayLayer::resetLevel` / `pauseGame` hooks**: anything still queued is delivered at once, so after a death, restart, checkpoint load or pause the game's button state matches what you're physically holding.
-- **`UILayer::init` hook**: adds the indicator label.
+A jump press **arms** the rescue window for N ticks (the stage). While it's armed:
 
-Inputs only ever move later, and only onto tick boundaries, so physics stays deterministic in normal and practice mode. The queue lives in the layer's `m_fields` and holds plain values only: no cocos objects are retained, and it is freed with the level.
+- **Early release (landing):** if you let go before the press did anything, your release is held back until the player jumps or flips, or the window ends. A tap that ended just before you landed still jumps. Logged as `(landing)`, with the number of ticks your release came early.
+- **Early press (orbs):** if you reach an orb inside the window, the press is sent again so the orb fires. Logged as `(orb)`, with how many ticks early you clicked.
+- **Flight modes** (ship, UFO, wave, swing) act on a press instantly, so they're never armed and hold lengths there are never changed.
 
-The editor's playtest is not affected (only `PlayLayer` is assisted).
+"The press did something" is read from the player at the start of every tick, by comparing it with a snapshot from the tick before:
 
-### Tuning
+- it left the ground moving upward, and no pad launched it (`PlayerObject::bumpPlayer`);
+- a ball or spider flipped gravity from the ground;
+- an orb or dash orb fired (`PlayerObject::ringJump`, `PlayerObject::startDashing`);
+- it switched to a mode where presses act instantly.
 
-- **Click Delay 1** (≈4 ms) is the subtlest setting. Raise it one tick at a time if you still tend to click early. Note that it delays *every* click, so late clicks get later too. It helps when your error is consistently early.
-- **Buffer 2–3** catches taps that end a few milliseconds before you land or hit an orb. In ship and wave it lengthens only taps shorter than the buffer, so keep it low there.
-- **0 / 0** is identical to vanilla.
+Inputs are only ever sent at tick boundaries, so physics stays deterministic. Before a death, restart, checkpoint load or pause, anything held on your behalf is let go first, so the game's buttons always match what you're holding.
+
+The logic lives in two game-independent classes:
+
+- **`src/RescueTracker.hpp`**: the rescue window.
+- **`src/InputScheduler.hpp`**: the fixed delay and input ordering.
+
+`src/main.cpp` hooks them into the game.
+
+### What it doesn't do
+
+It never moves an input **earlier** than you made it, and it doesn't react to hazards. Saving a late click or a late release would mean predicting or rewinding the game's physics, which this mod doesn't do.
 
 ## Building
 
-You need:
-
-- [Geode](https://geode-sdk.org) installed into Geometry Dash 2.2081
-- [Geode CLI](https://docs.geode-sdk.org/getting-started/geode-cli) and the SDK v5.11.2 or newer: `geode sdk install`, then `geode sdk install-binaries`
-- CMake 3.25+ and a compiler Geode v5 accepts: **Clang 19+**, or **MSVC 19.44+** (Visual Studio 2022 17.14 / 2026) on Windows
-
-Optionally, to auto-install builds into GD, run `geode profile add` once and point it at your GD folder.
-
-### Option A: build locally
-
-```sh
-cd input-assist
-geode build            # configures + builds with CMake, outputs chief.input-assist.geode
-```
-
-or with plain CMake:
-
-```sh
-cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build --config RelWithDebInfo
-```
-
-If a Geode CLI profile is set, the `.geode` file is copied into your mods folder automatically. Otherwise it's in `build/`.
-
-### Option B: build in GitHub Actions (all platforms, no local toolchain)
-
 Push this folder to a GitHub repository. `.github/workflows/multi-platform.yml` builds the Windows version, packages it as `chief.input-assist.geode`, and publishes it on the repo's **Releases** page.
+
+To build locally instead, you need [Geode CLI](https://docs.geode-sdk.org/getting-started/geode-cli), SDK v5.11.2 (`geode sdk install`, `geode sdk install-binaries`), CMake 3.25+ and Clang 19+ or MSVC 19.44+:
+
+```sh
+geode build
+```
 
 ## Installing
 
-Copy `chief.input-assist.geode` into the Geode mods folder and restart GD:
-
-- **Windows**: `<Geometry Dash folder>/geode/mods/`
-
-Or open the Geode menu in-game, click the folder icon, and drop the file there.
+Copy `chief.input-assist.geode` into `<Geometry Dash folder>/geode/mods/` and restart the game. In Steam: right-click Geometry Dash → Manage → Browse local files.
 
 Before publishing, change `"developer"` and the `id` prefix in `mod.json` to your own name.
 
 ## Tests
 
-The scheduling logic in `src/InputScheduler.hpp` has no game dependencies, so it can be tested on any machine:
+Both logic classes are tested on the host, with no Geode or GD needed:
 
 ```sh
+g++ -std=c++20 -Wall -Wextra -Isrc tests/rescue_test.cpp -o rescue_test && ./rescue_test
 g++ -std=c++20 -Wall -Wextra -Isrc tests/scheduler_test.cpp -o scheduler_test && ./scheduler_test
 ```
 
-Cases covered: vanilla passthrough, exact 1-tick delay, delay preserving hold length, buffering short taps, long holds untouched, per-button ordering, inputs arriving between ticks, independent buttons and players, flushes, settings changed mid-level. A 2,000-round randomized test also checks that every input lands exactly once, in order, never earlier than vanilla.
+Each has targeted cases plus randomized runs (5,000 and 2,000 rounds). They check four things:
+
+- The game always sees press and release alternate.
+- A held release never outlives the window.
+- The game's button ends up matching yours.
+- Delayed inputs never land early or out of order.
 
 ## Compatibility notes
 
-- **Click Between Frames / vanilla click-between-steps**: inputs that pass through undelayed keep their sub-tick timing. Inputs that are delayed land at the start of their tick, so they lose sub-tick precision (under 4.2 ms).
-- `handleButton` is hooked at `Priority::VeryEarly`, so other mods hooking it see each input once, when it actually lands.
-- Mods that reskin or replace `UILayer` may hide the indicator; the assist itself still works.
+- **Click Between Frames / vanilla click-between-steps:** inputs the mod sends itself (held releases, orb re-presses, delayed clicks) land at the start of a tick and lose sub-tick precision (under 4.2 ms). Everything else keeps its exact timing.
+- `handleButton` is hooked at `Priority::VeryEarly`, so other mods hooking it see each input once, when it actually reaches the game.
+- Mods that replace `UILayer` may hide the indicator; the assist itself still works.
 
 ## Fair play
 
-This changes gameplay timing, so it's tagged `cheat` for the Geode index. Completions made with it enabled count as hacked on community lists (Demonlist, Pointercrate, etc.). Turn it off, or use **Practice Mode Only**, for runs you plan to submit.
+This changes gameplay, so it's tagged `cheat` for the Geode index. Completions made with it enabled count as hacked on community lists (Demonlist, Pointercrate, etc.). Use **Practice Mode Only** or set the stage to Off for runs you plan to submit.

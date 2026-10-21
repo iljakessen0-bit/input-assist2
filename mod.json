@@ -5,9 +5,9 @@
 	},
 	"id": "chief.input-assist",
 	"name": "Input Assist",
-	"version": "v1.0.0",
+	"version": "v1.1.0",
 	"developer": "Chief",
-	"description": "Tick-based click delay and jump buffering for mistimed inputs.",
+	"description": "Early-click rescue: keeps a jump press alive for a few ticks so it still counts.",
 	"tags": ["gameplay", "cheat"],
 	"settings": {
 		"enabled": {
@@ -16,65 +16,67 @@
 			"description": "Master switch. Takes effect immediately, even mid-level.",
 			"default": true
 		},
-		"timing-title": {
+		"rescue-title": {
 			"type": "title",
-			"name": "Timing"
+			"name": "Rescue"
 		},
-		"press-delay": {
-			"type": "int",
-			"name": "Click Delay (ticks)",
-			"description": "Every click <cy>and</c> release is applied this many physics ticks later. GD runs at <cg>240 ticks per second</c>, so 1 tick is about <cg>4.2 ms</c>.\n\nHelps if you consistently click slightly early. Because releases move by the same amount, how long you hold is unchanged.\n\n<cy>1</c> is the subtlest setting. <cy>0</c> turns the delay off.",
-			"default": 1,
-			"min": 0,
-			"max": 24,
-			"control": {
-				"slider": true,
-				"slider-step": 1,
-				"arrows": true,
-				"arrow-step": 1,
-				"input": true
-			},
+		"stage": {
+			"type": "string",
+			"name": "Rescue Stage",
+			"description": "How long an early jump press stays alive. GD runs at <cg>240 ticks per second</c>, so 1 tick is about <cg>4.2 ms</c>.\n\nIf you let go before the press did anything, your release is held back until you land and jump, flip, or fire an orb, or until the window ends. If you reach an orb inside the window, the press is sent again so the orb fires.\n\nShip, UFO, wave and swing presses act instantly, so they are never held.",
+			"default": "Stage 1 (+2 ticks)",
+			"one-of": ["Off", "Stage 1 (+2 ticks)", "Stage 2 (+4 ticks)", "Stage 3 (+8 ticks)", "Stage 4 (+16 ticks)"],
 			"enable-if": "enabled"
 		},
-		"buffer-ticks": {
-			"type": "int",
-			"name": "Buffer Ticks",
-			"description": "Every press is held for <cy>at least</c> this many ticks before its release is applied.\n\nA tap you release just before landing, or just before entering an orb, then still counts as a jump. Holds that are already longer than this are not changed.\n\n<cy>0</c> turns buffering off.",
-			"default": 2,
-			"min": 0,
-			"max": 24,
-			"control": {
-				"slider": true,
-				"slider-step": 1,
-				"arrows": true,
-				"arrow-step": 1,
-				"input": true
-			},
-			"enable-if": "enabled"
-		},
-		"scope-title": {
-			"type": "title",
-			"name": "Scope"
-		},
-		"affect-movement": {
-			"type": "bool",
-			"name": "Affect Platformer Movement",
-			"description": "Also apply the delay and buffer to left/right in platformer levels. When off, only jump inputs are adjusted.",
-			"default": false,
-			"enable-if": "enabled"
+		"cycle-stage": {
+			"type": "keybind",
+			"name": "Cycle Stage",
+			"description": "Steps through Off, Stage 1, 2, 3 and 4. A toast shows the new stage.",
+			"default": "F6"
 		},
 		"practice-only": {
 			"type": "bool",
 			"name": "Practice Mode Only",
-			"description": "Only adjust inputs while practice mode is on. Normal attempts play exactly like vanilla.",
+			"description": "Only assist while practice mode is on. Normal attempts play exactly like vanilla.",
 			"default": false,
 			"enable-if": "enabled"
+		},
+		"feedback-title": {
+			"type": "title",
+			"name": "Feedback"
 		},
 		"show-indicator": {
 			"type": "bool",
 			"name": "Show Indicator",
-			"description": "Shows a small label in the top-left corner of a level while the assist is active.",
+			"description": "Shows the current stage in the top-left corner of a level, and each save under it for a moment.",
 			"default": true,
+			"enable-if": "enabled"
+		},
+		"log-saves": {
+			"type": "bool",
+			"name": "Log Saves",
+			"description": "Writes every save to Geode's log, e.g. <cy>Saved 3 ticks on tick 1042 (landing)</c>. To watch it live on Windows, turn on <cy>Show Platform Console</c> in Geode's own settings.",
+			"default": true,
+			"enable-if": "enabled"
+		},
+		"advanced-title": {
+			"type": "title",
+			"name": "Advanced"
+		},
+		"press-delay": {
+			"type": "int",
+			"name": "Fixed Click Delay (ticks)",
+			"description": "Moves every jump press <cy>and</c> release this many ticks later, keeping hold lengths the same. Helps only if you click consistently early. <cy>0</c> turns it off.",
+			"default": 0,
+			"min": 0,
+			"max": 24,
+			"control": {
+				"slider": true,
+				"slider-step": 1,
+				"arrows": true,
+				"arrow-step": 1,
+				"input": true
+			},
 			"enable-if": "enabled"
 		}
 	}
