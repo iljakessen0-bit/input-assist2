@@ -1,0 +1,26 @@
+{
+	"problemMatcher": [
+		{
+			"owner": "clang-error",
+			"pattern": [
+				{
+					"regexp": "^(.+?):(\\d+):(\\d+): (?:fatal )?(error): (.+)$",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"severity": 4,
+					"message": 5
+				}
+			]
+		},
+		{
+			"owner": "cmake-error",
+			"pattern": [
+				{
+					"regexp": "^(CMake Error.*)$",
+					"message": 1
+				}
+			]
+		}
+	]
+}
