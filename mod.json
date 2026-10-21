@@ -5,7 +5,7 @@
 	},
 	"id": "chief.input-assist",
 	"name": "Input Assist",
-	"version": "v1.1.0",
+	"version": "v1.1.1",
 	"developer": "Chief",
 	"description": "Early-click rescue: keeps a jump press alive for a few ticks so it still counts.",
 	"tags": ["gameplay", "cheat"],
@@ -57,6 +57,13 @@
 			"name": "Log Saves",
 			"description": "Writes every save to Geode's log, e.g. <cy>Saved 3 ticks on tick 1042 (landing)</c>. To watch it live on Windows, turn on <cy>Show Platform Console</c> in Geode's own settings.",
 			"default": true,
+			"enable-if": "enabled"
+		},
+		"detailed-log": {
+			"type": "bool",
+			"name": "Detailed Log",
+			"description": "Also logs every press that opens a rescue window: the mode, whether you were on the ground, how many orbs you were touching, when your release was held, and what ended the window. Turn on while testing, then send the log file from <cy>geode/logs</c>.",
+			"default": false,
 			"enable-if": "enabled"
 		},
 		"advanced-title": {

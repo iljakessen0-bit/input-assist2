@@ -35,11 +35,19 @@ public:
         bool enteredOrb = false;
     };
 
+    // Why the window closed on this step, if it did.
+    enum class End {
+        None,
+        Used,
+        Expired,
+    };
+
     struct StepResult {
         bool deliverRelease = false;
         // Send a release then a press, so the game sees a fresh click.
         bool rePress = false;
         std::optional<Save> save;
+        End end = End::None;
     };
 
     // A press reached the game on `tick`. A window of 0 (assist off) doesn't arm the tracker.
@@ -77,12 +85,14 @@ public:
             if (m_holdingRelease && !m_rePressed) {
                 result.save = Save{ tick - m_releaseTick, SaveKind::Landing };
             }
+            result.end = End::Used;
             *this = RescueTracker();
             return result;
         }
 
         if (tick >= m_pressTick + m_window) {
             result.deliverRelease = m_holdingRelease;
+            result.end = End::Expired;
             *this = RescueTracker();
             return result;
         }

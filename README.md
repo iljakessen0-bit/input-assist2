@@ -10,6 +10,7 @@ Early-click rescue for Geometry Dash, built on Geode SDK v5. A jump press that c
 | Practice Mode Only | off | Only assist while practice mode is on. |
 | Show Indicator | on | Stage in the top-left corner of a level, with each save shown under it for a moment. |
 | Log Saves | on | Writes every save to Geode's log: `Saved 3 ticks on tick 1042 (landing)`. |
+| Detailed Log | off | Also logs every press that opens a window and what ended it. For testing and tuning. |
 | Fixed Click Delay | 0 | Advanced: moves every jump press and release a fixed number of ticks later. |
 
 Settings live in **Geode → Input Assist → Settings**, including from the pause menu. To watch saves live on Windows, turn on **Show Platform Console** in Geode's own settings; a console window opens next to the game.

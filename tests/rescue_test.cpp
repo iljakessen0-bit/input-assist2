@@ -20,6 +20,7 @@ namespace {
 
     using Obs = RescueTracker::Observation;
     using Kind = RescueTracker::SaveKind;
+    using End = RescueTracker::End;
 
     struct Delivery {
         bool down;
@@ -32,6 +33,7 @@ namespace {
         int64_t window = 4;
         std::vector<Delivery> game;
         std::vector<RescueTracker::Save> saves;
+        std::vector<End> ends;
 
         void step(int64_t tick, Obs obs = {}) {
             auto result = tracker.step(tick, obs);
@@ -41,6 +43,7 @@ namespace {
             }
             if (result.deliverRelease) game.push_back({ false, tick });
             if (result.save) saves.push_back(*result.save);
+            ends.push_back(result.end);
         }
         void press(int64_t tick, bool actsInstantly = false) {
             if (tracker.takeHeldRelease()) game.push_back({ false, tick });
@@ -74,6 +77,7 @@ namespace {
         CHECK(!sim.game[1].down && sim.game[1].tick == 13);
         CHECK(sim.saves.size() == 1);
         CHECK(sim.saves[0].kind == Kind::Landing && sim.saves[0].ticks == 2);
+        CHECK(sim.ends.back() == End::Used);
         CHECK(!sim.tracker.armed());
     }
 
@@ -86,6 +90,7 @@ namespace {
         sim.step(14); // press tick + window
         CHECK(sim.game.size() == 2 && !sim.game[1].down && sim.game[1].tick == 14);
         CHECK(sim.saves.empty());
+        CHECK(sim.ends.back() == End::Expired);
     }
 
     void realHoldIsLeftAlone() {
@@ -110,6 +115,7 @@ namespace {
         sim.press(10);
         sim.release(11);
         sim.step(12, { .enteredOrb = true });
+        CHECK(sim.ends.back() == End::None); // still open: waiting for the orb to fire
         // Release + press so the game sees a fresh click on the orb.
         CHECK(sim.game.size() == 3);
         CHECK(!sim.game[1].down && sim.game[2].down && sim.game[2].tick == 12);

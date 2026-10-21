@@ -1,3 +1,6 @@
+# v1.1.1
+- Detailed Log setting: logs every press that opens a rescue window (mode, on the ground or not, orbs touched, held release) and what ended it, for tuning.
+
 # v1.1.0
 - Rescue window: an early jump press stays alive for 2, 4, 8 or 16 ticks. Releases are held until the jump happens, and orbs reached inside the window fire.
 - F6 (rebindable) cycles the stage in game, with a toast.

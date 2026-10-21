@@ -66,6 +66,7 @@ namespace {
         bool practiceOnly = false;
         bool showIndicator = true;
         bool logSaves = true;
+        bool detailedLog = false;
     };
 
     // Cached copy of the settings, so the per-tick path never touches the settings store.
@@ -86,6 +87,7 @@ namespace {
         g_config.practiceOnly = mod->getSettingValue<bool>("practice-only");
         g_config.showIndicator = mod->getSettingValue<bool>("show-indicator");
         g_config.logSaves = mod->getSettingValue<bool>("log-saves");
+        g_config.detailedLog = mod->getSettingValue<bool>("detailed-log");
     }
 
     void cycleStage() {
@@ -135,6 +137,23 @@ namespace {
     unsigned touchingOrbCount(PlayerObject* player) {
         return player->m_touchingRings ? player->m_touchingRings->count() : 0;
     }
+
+    char const* modeName(PlayerObject* player) {
+        if (player->m_isShip) return "ship";
+        if (player->m_isBird) return "ufo";
+        if (player->m_isDart) return "wave";
+        if (player->m_isSwing) return "swing";
+        if (player->m_isBall) return "ball";
+        if (player->m_isSpider) return "spider";
+        if (player->m_isRobot) return "robot";
+        return "cube";
+    }
+
+    // What the last tick did with a press, plus what used it for the detailed log.
+    struct Seen {
+        RescueTracker::Observation observation;
+        char const* usedBy = nullptr;
+    };
 
     // A player as it was at the start of a tick.
     struct PlayerSnapshot {
@@ -221,27 +240,29 @@ class $modify(AssistLayer, GJBaseGameLayer) {
     }
 
     // Compares the players with their snapshots: what did the last tick do with a press?
-    RescueTracker::Observation observe(bool isPlayer1) {
-        RescueTracker::Observation observation;
+    Seen observe(bool isPlayer1) {
+        Seen seen;
+        auto used = [&](char const* by) {
+            seen.observation.pressUsed = true;
+            if (!seen.usedBy) seen.usedBy = by;
+        };
         for (auto player : this->playersFor(isPlayer1)) {
             if (!player) continue;
-            if (actsInstantly(player)) observation.pressUsed = true;
+            if (actsInstantly(player)) used("flight mode");
 
             auto& before = m_fields->snapshots[player == m_player2 ? 1 : 0];
             if (!before.valid) continue;
             auto counters = static_cast<AssistPlayer*>(player)->m_fields.self();
 
-            if (counters->orbUses != before.orbUses) observation.pressUsed = true;
+            if (counters->orbUses != before.orbUses) used("orb");
             bool launchedByPad = counters->padBumps != before.padBumps;
-            if (before.onGround && !player->m_isOnGround && !launchedByPad && movingUp(player)) {
-                observation.pressUsed = true;
-            }
+            if (before.onGround && !player->m_isOnGround && !launchedByPad && movingUp(player)) used("jump");
             if ((player->m_isBall || player->m_isSpider) && before.onGround && player->m_isUpsideDown != before.upsideDown) {
-                observation.pressUsed = true;
+                used("flip");
             }
-            if (touchingOrbCount(player) > before.touchingOrbs) observation.enteredOrb = true;
+            if (touchingOrbCount(player) > before.touchingOrbs) seen.observation.enteredOrb = true;
         }
-        return observation;
+        return seen;
     }
 
     void takeSnapshots() {
@@ -296,12 +317,35 @@ class $modify(AssistLayer, GJBaseGameLayer) {
         if (down) {
             if (tracker.takeHeldRelease()) this->deliver(false, button, isPlayer1);
             this->deliver(true, button, isPlayer1);
-            tracker.onPress(tick, this->rescueWindow(), this->pressActsInstantly(isPlayer1));
+            auto window = this->rescueWindow();
+            tracker.onPress(tick, window, this->pressActsInstantly(isPlayer1));
+            if (g_config.detailedLog && window > 0) this->logPress(isPlayer1, window, tracker.armed());
             return;
         }
-        if (!tracker.onRelease(tick)) {
-            this->deliver(false, button, isPlayer1);
+        if (tracker.onRelease(tick)) {
+            if (g_config.detailedLog) log::info("[P{}] tick {}: release held", isPlayer1 ? 1 : 2, m_gameState.m_currentProgress);
+            return;
         }
+        this->deliver(false, button, isPlayer1);
+    }
+
+    // Detailed log: the state a press found the player in.
+    void logPress(bool isPlayer1, int64_t window, bool armed) {
+        auto player = this->playersFor(isPlayer1)[0];
+        if (!player) return;
+        if (!armed) {
+            log::info(
+                "[P{}] tick {}: press in {} acts instantly, not held",
+                isPlayer1 ? 1 : 2, m_gameState.m_currentProgress, modeName(player)
+            );
+            return;
+        }
+        log::info(
+            "[P{}] tick {}: press opened a {}-tick window ({}, {}, touching {} orb{})",
+            isPlayer1 ? 1 : 2, m_gameState.m_currentProgress, window, modeName(player),
+            player->m_isOnGround ? "on the ground" : "in the air",
+            touchingOrbCount(player), touchingOrbCount(player) == 1 ? "" : "s"
+        );
     }
 
     // Start of a tick: act on what the previous tick did with any press still in its window.
@@ -319,13 +363,29 @@ class $modify(AssistLayer, GJBaseGameLayer) {
                 continue;
             }
 
-            auto result = tracker.step(tick, this->observe(isPlayer1));
+            auto seen = this->observe(isPlayer1);
+            auto result = tracker.step(tick, seen.observation);
             if (result.rePress) {
                 this->deliver(false, kJump, isPlayer1);
                 this->deliver(true, kJump, isPlayer1);
             }
             if (result.deliverRelease) this->deliver(false, kJump, isPlayer1);
             if (result.save) this->reportSave(*result.save);
+
+            if (g_config.detailedLog) {
+                auto side = isPlayer1 ? 1 : 2;
+                auto attemptTick = m_gameState.m_currentProgress;
+                if (result.rePress) log::info("[P{}] tick {}: entered an orb, click sent again", side, attemptTick);
+                if (result.end == RescueTracker::End::Used) {
+                    log::info("[P{}] tick {}: press used ({})", side, attemptTick, seen.usedBy ? seen.usedBy : "?");
+                }
+                if (result.end == RescueTracker::End::Expired) {
+                    log::info(
+                        "[P{}] tick {}: window ran out, nothing used the press{}",
+                        side, attemptTick, result.deliverRelease ? "; held release let go" : ""
+                    );
+                }
+            }
         }
     }
 
